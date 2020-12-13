@@ -5,38 +5,40 @@ import argparse
 import logging
 import shlex
 import subprocess
-import httpie
 
-from httpie import core
+# from httpie import core as httpie
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Union
+
+from pprint import pprint
 
 # noinspection PyDefaultArgument
 def main(args: List[Union[str, bytes]] = sys.argv):
 
     module_dir = os.path.dirname(os.path.abspath(__file__))
     base_dir = os.getenv('HTTPIES_BASEDIR', False)
+    args, urlscript_args = parse_args()
+    log_level = logging.INFO
+
+
+    log_level = args.verbose
+
+    logging.basicConfig(format='%(levelname)s:%(message)s', level=log_level)
+
     if base_dir is False:
         logging.critical('$HTTPIES_BASEDIR not set, please add HTTPIES_BASEDIR to your environment variables.')
         sys.exit(-1)
 
     config_file = os.path.join(base_dir, 'httpies.conf')
     if not os.path.isfile(config_file):
-        config_file = os.path.join(module_dir, '../config/httpies.conf')
+        config_file = os.path.join(module_dir, 'httpies.conf')
         logging.info("Reading config from %s, you can overwrite this by adding httpies.conf to your base_dir" % config_file)
 
-    args, urlscript_args = parse_args()
+
     config = parse_config(config_file)
 
     props = merge_config(config, args)
-    log_level = logging.WARNING
-    if props['verbose'] is True:
-        log_level = logging.DEBUG
-
-    logging.basicConfig(format='%(levelname)s:%(message)s', level=log_level)
-
-    logging.debug("- reading config from: %s" % args.config)
-    logging.debug("- using base_dir: %s" % props['base_dir'])
+    logging.debug("using base_dir: %s" % props['base_dir'])
 
     if not os.path.isdir(props['base_dir']):
         logging.critical('- Base_dir "%s" does not exist, exiting' % props['base_dir'])
@@ -44,10 +46,10 @@ def main(args: List[Union[str, bytes]] = sys.argv):
     props = find_executable(props, config)
 
     httpie_args = exec_url_script(props, get_script_args(urlscript_args))
-    logging.debug("url-script returned:")
-    logging.debug("- %s", httpie_args)
+    logging.info("your url-script returned:")
+    logging.info(httpie_args)
 
-    exit_status = httpie.core.main(httpie_args.splitlines())
+    # exit_status = httpie.main(httpie_args.splitlines())
 
     sys.exit(exit_status)
 
@@ -65,7 +67,7 @@ def parse_args():
     arg_parser.add_argument('-b', '--basedir',
                             help="Set the url script base dir, will overwrite config file and environment")
     arg_parser.add_argument('-d', '--domain', help="Used to override the domain (ea. https://example.com)")
-    arg_parser.add_argument('-v', '--verbose', help="print debug output", action="store_true", default=False)
+    arg_parser.add_argument('-v', '--verbose', help="Set log-level (10=debug, 50=critical)", type=int, default=logging.WARNING, choices=[logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL])
     args, script_args = arg_parser.parse_known_args()
     return args, script_args
 
@@ -122,43 +124,51 @@ def exec_url_script(props, script_args):
         command_list.insert(0, props['exec_with'])
 
     command_list.extend(script_args)
-    logging.debug("Executing url-script as:")
-    logging.debug("- %s" % " ".join(command_list))
+    logging.info("Executing: %s" % " ".join(command_list))
     proc = subprocess.Popen(" ".join(command_list), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     stdout, stderr = proc.communicate()
     if len(stderr) > 0:
         logging.critical('%s : %s ' % (props['script_file'], stderr))
     if proc.returncode != 0:
-
         logging.critical('Url-script returned a non-zero exitcode, it returned "%s"', proc.returncode)
         logging.critical("tried to execute: %s" % " ".join(command_list))
+        ## mmm I really just wanna dump the contents of the script... for debugging
+        if props['verbose'] < 50:
+            print("\n DISABLE THIS MESSAGE using -v 50")
+            print("The stdout from your url-script was: \n")
+            print("%s" % stdout.decode("utf-8"))
+            print("The stderr from your url-script was: \n")
+            print("%s" % stderr.decode("utf-8"))
         sys.exit(proc.returncode)
 
     return stdout
 
 def find_executable(props, config):
+    logging.info("Looking for url-script: %s" % props['script_file'])
     if os.path.isfile(props['script_file']):
         if not os.access(props['script_file'], os.X_OK):
             if config.get('global', 'chmod_url_scripts') == 'yes':
-                logging.debug('Script file is not executable, running "chmod 0777 %s"' % props['script_file'])
+                logging.warning('Script file is not executable, running "chmod 0777 %s"' % props['script_file'])
                 os.system('chmod 0755 %s' % props['script_file'])
                 if not os.access(props['script_file'], os.X_OK):
-                    logging.critical('- Script is not executable, exiting')
+                    logging.critical('Script is not executable, exiting')
                     sys.exit(-1)
             else:
-                logging.critical('- Script is not executable, exiting')
+                logging.critical('Script is not executable, exiting')
                 sys.exit(-1)
+        logging.info("Found: %s" % props['script_file'])
         return props
-    else:
-        elements = dict(config.items('executables'))
-        for ext, exe in elements.items():
-            new_path = "%s.%s" % (props['script_file'], ext,)
-            logging.debug('Trying: %s' % new_path)
-            if os.path.isfile(new_path):
-                props['exec_with'] = exe
-                props['script_file'] = new_path
-                return props
 
-        logging.critical('- %s does not exist, exiting' % props['script_file'])
-        sys.exit(-1)
+    elements = dict(config.items('executables'))
+    for ext, exe in elements.items():
+        new_path = "%s.%s" % (props['script_file'], ext,)
+        logging.debug('Trying: %s' % new_path)
+        if os.path.isfile(new_path):
+            props['exec_with'] = exe
+            props['script_file'] = new_path
+            logging.info("Found: %s" % props['script_file'])
+            return props
+
+    logging.critical('- %s does not exist, exiting' % props['script_file'])
+    sys.exit(-1)

@@ -78,4 +78,4 @@ This is a first version and aldue working there are quite some improvements I wo
 - general testing
 - Passing arguments to your scriptfiles might be improved for other languages than python.
 - Allow testing, perhaps use a ".after" or ".test" extension allowing you to write tests based on the httpie response.
-- Test OsX and Windows, I am reasonably confident it will run on osX, yet I am just as confident that it won't run on windows.
+- Test OSX and Windows, I am reasonably confident it will run on osX, yet I am just as confident that it won't run on windows.
