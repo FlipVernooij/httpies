@@ -1,3 +1,4 @@
+from typing import List, Union
 import os
 import sys
 import configparser
@@ -6,23 +7,16 @@ import logging
 import shlex
 import subprocess
 
-# from httpie import core as httpie
+from httpie import core as httpie
 
-from typing import List, Union
 
-from pprint import pprint
 
-# noinspection PyDefaultArgument
+
 def main(args: List[Union[str, bytes]] = sys.argv):
-
     module_dir = os.path.dirname(os.path.abspath(__file__))
     base_dir = os.getenv('HTTPIES_BASEDIR', False)
     args, urlscript_args = parse_args()
-    log_level = logging.INFO
-
-
     log_level = args.verbose
-
     logging.basicConfig(format='%(levelname)s:%(message)s', level=log_level)
 
     if base_dir is False:
@@ -32,8 +26,9 @@ def main(args: List[Union[str, bytes]] = sys.argv):
     config_file = os.path.join(base_dir, 'httpies.conf')
     if not os.path.isfile(config_file):
         config_file = os.path.join(module_dir, 'httpies.conf')
-        logging.info("Reading config from %s, you can overwrite this by adding httpies.conf to your base_dir" % config_file)
-
+        logging.info(
+            "Reading config from %s, you can overwrite this by adding httpies.conf to your base_dir" % config_file
+        )
 
     config = parse_config(config_file)
 
@@ -49,17 +44,18 @@ def main(args: List[Union[str, bytes]] = sys.argv):
     logging.info("your url-script returned:")
     logging.info(httpie_args)
 
-    # exit_status = httpie.main(httpie_args.splitlines())
+    exit_status = httpie.main(httpie_args.splitlines())
 
     sys.exit(exit_status)
 
 
 def parse_args():
-    arg_parser = argparse.ArgumentParser(prog="httpies",
-                                         description="Script httie requests and execute them by url.",
-                                         epilog="Add param=value pairs to the command to append arguments to you urls scripts",
-                                         usage="%(prog)s get.py /user/profile script_arg_1=value script_arg_2=value"
-                                         )
+    arg_parser = argparse.ArgumentParser(
+                                prog="httpies",
+                                description="Script httie requests and execute them by url.",
+                                epilog="Add param=value pairs to the command to append arguments to you urls scripts",
+                                usage="%(prog)s get.py /user/profile script_arg_1=value script_arg_2=value"
+                             )
 
     arg_parser.add_argument('method', choices=['get', 'post', 'put', 'patch', 'delete'], help="Http request method")
     arg_parser.add_argument('url', help="The url to request (ea. /user/profile)")
@@ -67,9 +63,15 @@ def parse_args():
     arg_parser.add_argument('-b', '--basedir',
                             help="Set the url script base dir, will overwrite config file and environment")
     arg_parser.add_argument('-d', '--domain', help="Used to override the domain (ea. https://example.com)")
-    arg_parser.add_argument('-v', '--verbose', help="Set log-level (10=debug, 50=critical)", type=int, default=logging.WARNING, choices=[logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL])
+    arg_parser.add_argument('-v', '--verbose',
+                            help="Set log-level (10=debug, 50=critical)",
+                            type=int,
+                            default=logging.WARNING,
+                            choices=[logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL]
+                            )
     args, script_args = arg_parser.parse_known_args()
     return args, script_args
+
 
 def parse_config(config_file):
     config = configparser.RawConfigParser()
@@ -77,12 +79,15 @@ def parse_config(config_file):
     config.read(config_file)
     return config
 
+
 def merge_config(config, args):
     props = {
         "base_dir":os.getenv('HTTPIES_BASEDIR'),
         "executable": config.get('global', 'httpie_executable_name'),
         "method": args.method,
-        "domain": args.domain if args.domain else os.getenv('HTTPIES_DEFAULT_DOMAIN', config.get('global', 'default_domain')),
+        "domain": args.domain if args.domain else os.getenv('HTTPIES_DEFAULT_DOMAIN',
+                                                            config.get('global', 'default_domain')
+                                                            ),
         "url": args.url,
         "script_file": None,
         "verbose": args.verbose
@@ -94,8 +99,13 @@ def merge_config(config, args):
     if url[0] == '/':
         url = url[1:]
 
-    props['script_file'] = os.path.join(props['base_dir'], config.get('global', 'url_script_dir'), url, props['method'].lower())
+    props['script_file'] = os.path.join(props['base_dir'],
+                                        config.get('global', 'url_script_dir'),
+                                        url,
+                                        props['method'].lower()
+                                        )
     return props
+
 
 def get_script_args(script_args):
     return_list = []
@@ -111,6 +121,7 @@ def get_script_args(script_args):
             else:
                 dashes = ''
     return return_list
+
 
 def exec_url_script(props, script_args):
     command_list = [
@@ -133,7 +144,8 @@ def exec_url_script(props, script_args):
     if proc.returncode != 0:
         logging.critical('Url-script returned a non-zero exitcode, it returned "%s"', proc.returncode)
         logging.critical("tried to execute: %s" % " ".join(command_list))
-        ## mmm I really just wanna dump the contents of the script... for debugging
+        # I really just wanna dump the contents of the script... for debugging
+        # @todo is this how we wanna do this.
         if props['verbose'] < 50:
             print("\n DISABLE THIS MESSAGE using -v 50")
             print("The stdout from your url-script was: \n")
@@ -143,6 +155,7 @@ def exec_url_script(props, script_args):
         sys.exit(proc.returncode)
 
     return stdout
+
 
 def find_executable(props, config):
     logging.info("Looking for url-script: %s" % props['script_file'])
