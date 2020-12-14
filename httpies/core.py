@@ -23,14 +23,7 @@ def main(args: List[Union[str, bytes]] = sys.argv):
         logging.critical('$HTTPIES_BASEDIR not set, please add HTTPIES_BASEDIR to your environment variables.')
         sys.exit(-1)
 
-    config_file = os.path.join(base_dir, 'httpies.conf')
-    if not os.path.isfile(config_file):
-        config_file = os.path.join(module_dir, 'httpies.conf')
-        logging.info(
-            "Reading config from %s, you can overwrite this by adding httpies.conf to your base_dir" % config_file
-        )
-
-    config = parse_config(config_file)
+    config = parse_config(module_dir, base_dir)
 
     props = merge_config(config, args)
     logging.debug("using base_dir: %s" % props['base_dir'])
@@ -42,9 +35,9 @@ def main(args: List[Union[str, bytes]] = sys.argv):
 
     httpie_args = exec_url_script(props, get_script_args(urlscript_args))
     logging.info("your url-script returned:")
-    logging.info(httpie_args)
+    logging.info(httpie_args.decode('utf-8'))
 
-    exit_status = httpie.main(httpie_args.splitlines())
+    exit_status = exec_request(httpie_args)
 
     sys.exit(exit_status)
 
@@ -73,10 +66,16 @@ def parse_args():
     return args, script_args
 
 
-def parse_config(config_file):
+def parse_config(module_dir, base_dir):
+    base_file = os.path.join(base_dir, 'httpies.conf')
+    mod_file = os.path.join(module_dir, 'httpies.conf')
+    if not os.path.isfile(base_file):
+        logging.info(
+            "Reading config from %s, you can overwrite this by adding httpies.conf to your base_dir" % mod_file
+        )
+
     config = configparser.RawConfigParser()
-    config_file = os.path.realpath(config_file)
-    config.read(config_file)
+    config.read([mod_file, base_file])
     return config
 
 
@@ -123,6 +122,35 @@ def get_script_args(script_args):
     return return_list
 
 
+def find_executable(props, config):
+    logging.info("Looking for url-script: %s" % props['script_file'])
+    if os.path.isfile(props['script_file']):
+        if not os.access(props['script_file'], os.X_OK):
+            if config.get('global', 'chmod_url_scripts') == 'yes':
+                logging.warning('Script file is not executable, running "chmod 0777 %s"' % props['script_file'])
+                os.system('chmod 0755 %s' % props['script_file'])
+                if not os.access(props['script_file'], os.X_OK):
+                    logging.critical('Script is not executable, exiting')
+                    sys.exit(-1)
+            else:
+                logging.critical('Script is not executable, exiting')
+                sys.exit(-1)
+        logging.info("Found: %s" % props['script_file'])
+        return props
+
+    elements = dict(config.items('executables'))
+    for ext, exe in elements.items():
+        new_path = "%s.%s" % (props['script_file'], ext,)
+        logging.debug('Trying: %s' % new_path)
+        if os.path.isfile(new_path):
+            props['exec_with'] = exe
+            props['script_file'] = new_path
+            logging.info("Found: %s" % props['script_file'])
+            return props
+
+    logging.critical('- %s does not exist, exiting' % props['script_file'])
+    sys.exit(-1)
+
 def exec_url_script(props, script_args):
     command_list = [
         props['script_file'],
@@ -156,32 +184,8 @@ def exec_url_script(props, script_args):
 
     return stdout
 
+def exec_request(httpie_args):
+    args = httpie_args.splitlines()
+    args = [x.strip() for x in args]
+    httpie.main(args)
 
-def find_executable(props, config):
-    logging.info("Looking for url-script: %s" % props['script_file'])
-    if os.path.isfile(props['script_file']):
-        if not os.access(props['script_file'], os.X_OK):
-            if config.get('global', 'chmod_url_scripts') == 'yes':
-                logging.warning('Script file is not executable, running "chmod 0777 %s"' % props['script_file'])
-                os.system('chmod 0755 %s' % props['script_file'])
-                if not os.access(props['script_file'], os.X_OK):
-                    logging.critical('Script is not executable, exiting')
-                    sys.exit(-1)
-            else:
-                logging.critical('Script is not executable, exiting')
-                sys.exit(-1)
-        logging.info("Found: %s" % props['script_file'])
-        return props
-
-    elements = dict(config.items('executables'))
-    for ext, exe in elements.items():
-        new_path = "%s.%s" % (props['script_file'], ext,)
-        logging.debug('Trying: %s' % new_path)
-        if os.path.isfile(new_path):
-            props['exec_with'] = exe
-            props['script_file'] = new_path
-            logging.info("Found: %s" % props['script_file'])
-            return props
-
-    logging.critical('- %s does not exist, exiting' % props['script_file'])
-    sys.exit(-1)
