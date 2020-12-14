@@ -41,7 +41,7 @@ In some way, it's a terminal based postman-like implementation that offers much 
     sys.exit(0)
 
 # Execute your request
-    https get /user -u "flip@github.com"
+    https get /user -u="flip@github.com"
 It is as simple as that,.. enjoy the response.
   
 # Supported extensions:
