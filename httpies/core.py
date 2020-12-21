@@ -143,7 +143,7 @@ def find_executable(props, config):
         new_path = "%s.%s" % (props['script_file'], ext,)
         logging.debug('Trying: %s' % new_path)
         if os.path.isfile(new_path):
-            props['exec_with'] = exe
+            props['exec_with'] = exe.replace('[HTTPIES_BASEDIR]', props['base_dir'])
             props['script_file'] = new_path
             logging.info("Found: %s" % props['script_file'])
             return props

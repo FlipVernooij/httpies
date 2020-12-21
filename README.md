@@ -78,7 +78,6 @@ Check the [httpies documentation](https://httpie.io/docs)
     echo "username==" . $args['username'] . "\n";
     echo "--json \n";
     echo "--verbose \n";
-    echo "username==" . $args['username'] . "\n";
     exit(0);    
 
 ## Execute your request
