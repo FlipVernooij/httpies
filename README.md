@@ -80,6 +80,31 @@ Check the [httpies documentation](https://httpie.io/docs)
     echo "--verbose \n";
     exit(0);    
 
+### sh Example
+    \[BASE_DIR\]/user/get.sh
+    $username="default@example.com"
+    
+    # Parse the arguments, 
+    ## --username=flip@github.com will create the variable $username=flip@github.com
+    for((i=0;i<=$#;i++));
+        do
+            arg="${!i}";
+            if [[ $arg == --* ]]
+                then
+                    full=${arg#??};
+                    eval $full;
+            fi
+        done
+    
+    cat << EOF
+        $1
+        $2$3
+        username==$username
+        --json
+        --verbose
+    EOF
+
+    
 ## Execute your request
     https get /user --username="flip@github.com"
 It is as simple as that,.. enjoy the response.
@@ -97,7 +122,11 @@ It is as simple as that,.. enjoy the response.
   - .bsh (bash)
   - .sh  (sh)
   
-## Adding a new extension to the config-file.
+## Adding a new extension.
+Create an empty an empty config file in your basedir:
+    touch [BASE_DIR]/httpies.conf
+    
+Then add the following entry:    
     \[executables\]
     py = python
     hp = php
@@ -110,7 +139,14 @@ It is as simple as that,.. enjoy the response.
 # Config files
 
 By default, httpies works out of the box for most users.
-Yet you might have specific wishes and 
+Yet you might have specific wishes for one of your projects.
+You can find the configfile that is used by running
+
+    https -v20 get /test
+    
+The request will most probably end with an error, yet it will show you the currently used configfile at the first line of output.
+You can either copy this file to your basedir, or just duplicated the required entries.
+When httpies is executed, it first reads it's own config and will overwrite it with the properties found in your own config that resides in your \[base_dir\]
 
 # Files without a extension
 By default htties will make these files executable (you can disable this in the config) and will try to execute them in order to receive the response.
