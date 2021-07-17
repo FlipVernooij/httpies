@@ -1,3 +1,4 @@
+from pprint import pprint
 from typing import List, Union
 import os
 import sys
@@ -46,8 +47,9 @@ def parse_args():
     arg_parser = argparse.ArgumentParser(
                                 prog="httpies",
                                 description="Script httie requests and execute them by url.",
-                                epilog="Add param=value pairs to the command to append arguments to you urls scripts",
-                                usage="%(prog)s get.py /user/profile script_arg_1=value script_arg_2=value"
+                                epilog="Add \"param=value\" pairs to the command to pass arguments to you urls scripts (used for GET/POST values). \n"
+                                       "To UNSET a parameter that is set within your url script, use \"param=None\"",
+                                usage="%(prog)s get.py /user/profile script_arg_1=value script_arg_2=value script_unset_value=None"
                              )
 
     arg_parser.add_argument('method', choices=['get', 'post', 'put', 'patch', 'delete'], help="Http request method")
@@ -112,7 +114,8 @@ def get_script_args(script_args):
     for arg in script_args:
         splitted = arg.split('=', 1)
         if len(splitted) == 2:
-            return_list.append("%s=%s" % (splitted[0], shlex.quote(splitted[1]),))
+            if splitted[1] != 'None':
+                return_list.append("%s=%s" % (splitted[0], shlex.quote(splitted[1]),))
         else:
             return_list.append("%s%s" % (dashes, shlex.quote(arg)))
             if dashes == '':
