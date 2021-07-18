@@ -114,8 +114,7 @@ def get_script_args(script_args):
     for arg in script_args:
         splitted = arg.split('=', 1)
         if len(splitted) == 2:
-            if splitted[1] != 'None':
-                return_list.append("%s=%s" % (splitted[0], shlex.quote(splitted[1]),))
+            return_list.append("%s=%s" % (splitted[0], shlex.quote(splitted[1]),))
         else:
             return_list.append("%s%s" % (dashes, shlex.quote(arg)))
             if dashes == '':
