@@ -1,4 +1,5 @@
 from pprint import pprint
+from time import sleep
 from typing import List, Union
 import os
 import sys
@@ -29,18 +30,29 @@ def main(args: List[Union[str, bytes]] = sys.argv):
     props = merge_config(config, args)
     logging.debug("using base_dir: %s" % props['base_dir'])
 
+    pprint(props)
+
     if not os.path.isdir(props['base_dir']):
         logging.critical('- Base_dir "%s" does not exist, exiting' % props['base_dir'])
         sys.exit(-1)
-    props = find_executable(props, config)
+    exec_props = find_executable(props, config)
 
-    httpie_args = exec_url_script(props, get_script_args(urlscript_args))
+
+    httpie_args = exec_url_script(exec_props, get_script_args(urlscript_args))
     logging.info("your url-script returned:")
     logging.info(httpie_args.decode('utf-8'))
 
-    exit_status = exec_request(httpie_args)
 
-    sys.exit(exit_status)
+    if exec_props['watch'] is None:
+        exit_status = exec_request(httpie_args)
+        sys.exit(exit_status)
+    else:
+        while True:
+            exec_request(httpie_args)
+            print(f"--Re-executing every {exec_props['watch']} seconds--\n")
+            sleep(int(exec_props['watch']))
+
+
 
 
 def parse_args():
@@ -54,6 +66,7 @@ def parse_args():
 
     arg_parser.add_argument('method', choices=['get', 'post', 'put', 'patch', 'delete'], help="Http request method")
     arg_parser.add_argument('url', help="The url to request (ea. /user/profile)")
+    arg_parser.add_argument('-w', '--watch', help="Internal watch replacement, execute the command every [x] seconds untill killed")
     arg_parser.add_argument('-c', '--config',  help="Set config file to read")
     arg_parser.add_argument('-b', '--basedir',
                             help="Set the url script base dir, will overwrite config file and environment")
@@ -91,7 +104,8 @@ def merge_config(config, args):
                                                             ),
         "url": args.url,
         "script_file": None,
-        "verbose": args.verbose
+        "verbose": args.verbose,
+        "watch": args.watch
     }
     if args.basedir:
         props['base_dir'] = os.path.realpath(args.basedir)
